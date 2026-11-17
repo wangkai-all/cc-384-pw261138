@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跨域对账控制台</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #171d26;
+    --panel-2: #1e2632;
+    --line: #2b3648;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --accent: #4da3ff;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --bad: #f85149;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+  }
+  header {
+    padding: 18px 24px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+  }
+  h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  .sub { color: var(--muted); font-size: 12px; }
+  main { padding: 20px 24px 80px; max-width: 1280px; margin: 0 auto; }
+  section { margin-bottom: 20px; }
+  .grid { display: grid; gap: 16px; }
+  .cols-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .cols-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 16px;
+  }
+  .card h2 {
+    font-size: 13px; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 12px; font-weight: 600;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+    padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.danger { border-color: #6e2b2b; color: #ffb4ac; }
+  button.ok { border-color: #1f5c2a; color: #9be3a3; }
+  select, input {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; font-size: 13px;
+  }
+  label { color: var(--muted); font-size: 12px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px;
+    border-radius: 999px; font-size: 12px; border: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .ok .dot, .dot.ok { background: var(--ok); }
+  .warn .dot, .dot.warn { background: var(--warn); }
+  .bad .dot, .dot.bad { background: var(--bad); }
+  .accent .dot, .dot.accent { background: var(--accent); }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; }
+  td.num { text-align: right; font-family: var(--mono); }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); }
+  .banner {
+    padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel-2); font-size: 13px; margin-bottom: 12px;
+  }
+  .banner.aligned { border-color: #1f5c2a; background: #10231a; }
+  .banner.degraded_stale { border-color: #6b5315; background: #241f10; }
+  .banner.partial { border-color: #6e2b2b; background: #251313; }
+  .banner.unknown { border-color: var(--line); }
+  .tag {
+    display: inline-block; padding: 0 7px; border-radius: 5px; font-size: 11px;
+    border: 1px solid var(--line); color: var(--muted); margin-left: 6px;
+  }
+  .tag.ok { color: var(--ok); border-color: #1f5c2a; }
+  .tag.bad { color: var(--bad); border-color: #6e2b2b; }
+  .scroll { max-height: 340px; overflow: auto; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+  pre {
+    margin: 8px 0 0; padding: 10px; background: #0b1016; border: 1px solid var(--line);
+    border-radius: 6px; overflow: auto; max-height: 260px; font-size: 11.5px;
+    font-family: var(--mono); color: #c6d2de;
+  }
+  .stat { font-size: 22px; font-family: var(--mono); }
+  .stat-label { color: var(--muted); font-size: 12px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+  ul.plain { margin: 0; padding-left: 18px; font-size: 12.5px; }
+  ul.plain li { margin: 3px 0; }
+  .toast {
+    position: fixed; right: 20px; bottom: 20px; max-width: 420px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 14px; font-size: 13px; box-shadow: 0 8px 30px rgba(0,0,0,.4);
+    opacity: 0; transform: translateY(8px); transition: all .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.bad { border-color: #6e2b2b; }
+</style>
+</head>
+<body>
+<header>
+  <h1>跨域对账控制台</h1>
+  <span class="sub">订单域 × 结算域 · 按共同业务批次快照关联，不拼接各自最新版</span>
+  <span id="clock" class="sub mono"></span>
+</header>
+<main>
+  <div id="banner" class="banner unknown">加载中…</div>
+
+  <section class="grid cols-3">
+    <div class="card" id="card-orders">
+      <h2>订单域 orders</h2>
+      <div class="row"><span class="pill" id="orders-state"><span class="dot"></span><span>未知</span></span></div>
+      <dl class="kv" id="orders-kv" style="margin-top:12px"></dl>
+      <div class="row" style="margin-top:12px">
+        <button class="ok" data-start="orders">启动</button>
+        <button class="danger" data-stop="orders">停机</button>
+        <button data-advance="orders">推进下一批</button>
+        <button data-unconfirmed="orders">推进待确认批</button>
+        <button data-revise="orders">修订当前批</button>
+        <button data-gc="orders">GC</button>
+      </div>
+    </div>
+    <div class="card" id="card-settlement">
+      <h2>结算域 settlement</h2>
+      <div class="row"><span class="pill" id="settlement-state"><span class="dot"></span><span>未知</span></span></div>
+      <dl class="kv" id="settlement-kv" style="margin-top:12px"></dl>
+      <div class="row" style="margin-top:12px">
+        <button class="ok" data-start="settlement">启动</button>
+        <button class="danger" data-stop="settlement">停机</button>
+        <button data-advance="settlement">推进下一批</button>
+        <button data-unconfirmed="settlement">推进待确认批</button>
+        <button data-revise="settlement">修订当前批</button>
+        <button data-gc="settlement">GC</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>协调器 coordinator</h2>
+      <div class="row"><span class="pill" id="coord-state"><span class="dot"></span><span>未知</span></span></div>
+      <div class="row" style="margin-top:12px">
+        <button class="ok" data-coord="start">启动协调器</button>
+        <button class="danger" data-coord="stop">停止协调器</button>
+        <button data-refresh>刷新状态</button>
+      </div>
+      <div style="margin-top:14px">
+        <label for="policy">可用性策略</label>
+        <select id="policy">
+          <option value="aligned_with_explicit_partial">aligned_with_explicit_partial（默认）</option>
+          <option value="strict">strict（不对齐即 503）</option>
+        </select>
+        <div class="row" style="margin-top:8px">
+          <label for="wait">最长等待 ms</label>
+          <input id="wait" type="number" value="1500" min="0" max="5000" step="100" style="width:100px">
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="run-report">发起查询</button>
+        <button data-hold-task="60">持有租约 60s</button>
+        <button data-release-stale>用旧 token 释放</button>
+      </div>
+      <div id="tasks" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <section class="grid cols-3" id="summary-cards" style="display:none">
+    <div class="card"><div class="stat-label">一致性模式</div><div class="stat" id="sum-mode">—</div></div>
+    <div class="card"><div class="stat-label">选定共同批次</div><div class="stat" id="sum-batch">—</div></div>
+    <div class="card"><div class="stat-label">等待耗时</div><div class="stat" id="sum-wait">—</div></div>
+    <div class="card"><div class="stat-label">订单 / 结算记录</div><div class="stat" id="sum-counts">—</div></div>
+    <div class="card"><div class="stat-label">订单金额合计</div><div class="stat" id="sum-order-total">—</div></div>
+    <div class="card"><div class="stat-label">结算金额合计</div><div class="stat" id="sum-settle-total">—</div></div>
+  </section>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h2>两域选版依据</h2>
+      <div class="scroll"><table id="selection-table">
+        <thead><tr><th>域</th><th>选定批次</th><th>版本</th><th>该域最新</th><th>滞后</th><th>校验和</th><th class="num">记录</th><th class="num">金额</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div id="selection-note" class="muted" style="margin-top:10px;font-size:12px"></div>
+    </div>
+    <div class="card">
+      <h2>各域可用性与租约</h2>
+      <div class="scroll"><table id="domain-table">
+        <thead><tr><th>域</th><th>可达</th><th>最新批次</th><th>选中</th><th>校验</th><th>租约</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div id="lease-note" class="muted" style="margin-top:10px;font-size:12px"></div>
+    </div>
+  </section>
+
+  <section class="grid cols-2">
+    <div class="card">
+      <h2>未覆盖范围</h2>
+      <div id="uncovered" class="empty">尚未查询</div>
+    </div>
+    <div class="card">
+      <h2>对比两次查询</h2>
+      <div class="row">
+        <select id="cmp-left"></select>
+        <span class="muted">vs</span>
+        <select id="cmp-right"></select>
+        <button id="compare">比较输出</button>
+      </div>
+      <div id="compare-out" class="empty" style="margin-top:12px">保存至少两次查询后可比较</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>运行日志 / 最近事件</h2>
+    <div class="row" style="margin-bottom:10px">
+      <button data-log="orders">订单域日志</button>
+      <button data-log="settlement">结算域日志</button>
+      <button data-log="coordinator">协调器日志</button>
+    </div>
+    <pre id="log-out">点击上方按钮查看服务日志尾部</pre>
+    <details style="margin-top:12px">
+      <summary>原始报告 JSON</summary>
+      <pre id="raw-report">—</pre>
+    </details>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const money = c => (c == null ? '—' : '¥' + (c / 100).toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let lastReport = null;
+
+function toast(msg, bad = false) {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (bad ? ' bad' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = 'toast', 3200);
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    headers: {'Content-Type': 'application/json'},
+    ...options,
+  });
+  const text = await res.text();
+  let body;
+  try { body = text ? JSON.parse(text) : {}; } catch { body = {raw: text}; }
+  if (!res.ok) {
+    const msg = body.message || body.error || `HTTP ${res.status}`;
+    throw Object.assign(new Error(msg), {status: res.status, body});
+  }
+  return body;
+}
+
+function statePill(el, running, label) {
+  el.className = 'pill ' + (running ? 'ok' : 'bad');
+  el.innerHTML = `<span class="dot"></span><span>${esc(label)}</span>`;
+}
+
+function renderStatus(s) {
+  for (const name of ['orders', 'settlement']) {
+    const d = s.domains[name] || {};
+    const running = d.process === 'running';
+    statePill($(`#${name}-state`), running, running ? '运行中' : '已停机');
+    const h = d.health || {};
+    const kv = $(`#${name}-kv`);
+    kv.innerHTML = running
+      ? `<dt>已发布</dt><dd>${h.published_batches ?? '—'} 批</dd>
+         <dt>待发布</dt><dd>${h.pending_batches ?? '—'} 批</dd>
+         <dt>活跃租约</dt><dd>${h.active_pins ?? '—'}</dd>
+         <dt>端口</dt><dd>${esc(s.ports[name])}</dd>`
+      : `<dt>状态</dt><dd>进程未运行，数据持久化在 SQLite</dd>
+         <dt>端口</dt><dd>${esc(s.ports[name])}</dd>`;
+  }
+  statePill($('#coord-state'), s.coordinator === 'running',
+            s.coordinator === 'running' ? '运行中' : '已停止');
+  renderTasks(s.tasks || []);
+  const sel = $('#cmp-left'), selR = $('#cmp-right');
+  const reports = s.reports || [];
+  const opts = reports.map(r => `<option value="${esc(r.run_id)}">${esc(r.run_id)} · ${esc(r.mode)} · ${esc(r.batch_id || '无批次')}</option>`).join('');
+  if (sel.dataset.sig !== opts) {
+    sel.innerHTML = opts; selR.innerHTML = opts;
+    sel.dataset.sig = opts;
+    if (reports.length >= 2) {
+      sel.value = reports[reports.length - 1].run_id;
+      selR.value = reports[reports.length - 2].run_id;
+    }
+  }
+}
+
+function renderTasks(tasks) {
+  const box = $('#tasks');
+  if (!tasks.length) { box.innerHTML = '<div class="empty">暂无长任务租约</div>'; return; }
+  box.innerHTML = tasks.map(t => `
+    <div class="banner" style="margin-bottom:8px">
+      <div class="mono" style="font-size:12px">${esc(t.task_id)} · ${esc(t.batch_id)}</div>
+      <div class="muted" style="font-size:12px;margin-top:4px">
+        ${Object.values(t.pins || {}).map(p => `${esc(p.domain)}:${esc(p.snapshot_id)}`).join(' · ')}
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button data-release-task="${esc(t.task_id)}">正常释放</button>
+        <button class="danger" data-release-stale-task="${esc(t.task_id)}">旧 token 释放</button>
+      </div>
+      ${t.stale_release_attempt ? `<div class="muted" style="font-size:11.5px;margin-top:6px">最近一次旧 token 释放：${esc(t.stale_release_attempt.explanation)}</div>` : ''}
+    </div>`).join('');
+}
+
+function renderReport(r) {
+  lastReport = r;
+  const c = r.consistency || {};
+  const banner = $('#banner');
+  const modeLabel = {aligned: '已对齐', degraded_stale: '退回共同旧版', partial: '不完整结果'}[c.mode] || c.mode;
+  banner.className = 'banner ' + (c.mode || 'unknown');
+  banner.innerHTML = `<strong>${esc(modeLabel)}</strong> — ${esc(c.reason || '')}
+    <span class="tag">run ${esc(r.run_id)}</span>
+    ${c.joined ? `<span class="tag ok">已按 batch_id 关联</span>` : `<span class="tag bad">未关联</span>`}`;
+
+  $('#summary-cards').style.display = '';
+  $('#sum-mode').textContent = c.mode;
+  $('#sum-batch').textContent = (c.joined_batch_ids || [])[0] || '无';
+  $('#sum-wait').textContent = `${r.waited_ms ?? '—'} ms`;
+  const orders = (r.records || {}).orders || [];
+  const settlements = (r.records || {}).settlement || [];
+  $('#sum-counts').textContent = `${orders.length} / ${settlements.length}`;
+  const ot = orders.reduce((a, o) => a + (o.amount_cents || 0), 0);
+  const st = settlements.reduce((a, o) => a + (o.amount_cents || 0), 0);
+  $('#sum-order-total').textContent = money(ot);
+  $('#sum-settle-total').textContent = money(st);
+
+  const sel = r.selection || {};
+  $('#selection-table tbody').innerHTML = Object.entries(sel).sort().map(([name, s]) => `
+    <tr><td>${esc(name)}</td><td class="mono">${esc(s.batch_id)}</td><td>v${s.version}</td>
+    <td>${s.is_domain_latest ? '<span class="tag ok">是</span>' : '<span class="tag">否</span>'}</td>
+    <td>${s.lag_batches}</td>
+    <td class="mono" title="${esc(s.checksum)}">${esc((s.checksum || '').slice(0, 18))}…</td>
+    <td class="num">${s.record_count}</td><td class="num">${money(s.total_amount_cents)}</td></tr>`).join('')
+    || '<tr><td colspan="8" class="empty">没有形成跨域共同批次，未读取任何单域最新版</td></tr>';
+  $('#selection-note').textContent = c.selection_rule || '';
+
+  const domains = r.domains || {};
+  $('#domain-table tbody').innerHTML = Object.entries(domains).sort().map(([name, d]) => {
+    const lease = (r.leases || {})[name];
+    return `<tr><td>${esc(name)}</td>
+      <td>${d.reachable ? '<span class="tag ok">可达</span>' : '<span class="tag bad">不可达</span>'}</td>
+      <td class="mono">${esc(d.latest_batch_id || '—')}</td>
+      <td>${d.selected ? '是' : '否'}</td>
+      <td>${d.checksum_verified ? '<span class="tag ok">通过</span>' : '<span class="tag">—</span>'}</td>
+      <td class="mono">${lease ? esc(lease.pin_id) : '—'}</td></tr>`;
+  }).join('');
+  const released = (r.lease_release || []).map(x => `${x.domain}:${x.released ? '已释放' : '释放失败'}`).join(' · ');
+  $('#lease-note').textContent = released || '本次未加租约';
+
+  const u = r.uncovered || {};
+  const blocks = [];
+  if ((u.unreachable_domains || []).length) blocks.push(`<strong>不可达域：</strong>${u.unreachable_domains.map(esc).join(', ')}`);
+  if (u.batch_gap) blocks.push(`<strong>选定批次之后：</strong>${u.batch_gap.count} 个已发布批次未覆盖 ${u.batch_gap.later_published_batches.map(b => `<span class="mono">${esc(b)}</span>`).join(', ')}`);
+  for (const [name, list] of Object.entries(u.pending_batches || {})) {
+    if (list.length) blocks.push(`<strong>${esc(name)} 待发布：</strong>${list.map(b => `<span class="mono">${esc(b)}</span>`).join(', ')}`);
+  }
+  for (const [name, list] of Object.entries(u.unpaired_batches || {})) {
+    if (list.length) blocks.push(`<strong>${esc(name)} 独有批次（对端未发布）：</strong>${list.map(b => `<span class="mono">${esc(b)}</span>`).join(', ')}`);
+  }
+  for (const [name, list] of Object.entries(u.excluded_versions || {})) {
+    if (list.length) blocks.push(`<strong>${esc(name)} 被排除版本：</strong>` + list.map(x => `<span class="mono">${esc(x.batch_id)}</span>（${esc(x.reason)}）`).join('；'));
+  }
+  const missing = u.orders_without_settlement || {};
+  blocks.push(`<strong>已完成但无结算的订单：</strong>${missing.count ?? 0} 条 ${missing.order_ids && missing.order_ids.length ? `（示例 ${missing.order_ids.slice(0,6).map(esc).join(', ')}${missing.truncated ? '…' : ''}）` : ''}`);
+  if ((u.unconfirmed_latest || []).length) blocks.push(`<strong>最新未确认快照：</strong>${u.unconfirmed_latest.map(x => `${esc(x.domain)}/${esc(x.batch_id)}`).join(', ')}`);
+  $('#uncovered').className = blocks.length ? '' : 'empty';
+  $('#uncovered').innerHTML = blocks.length ? `<ul class="plain">${blocks.map(b => `<li>${b}</li>`).join('')}</ul>` : '无';
+  $('#raw-report').textContent = JSON.stringify(r, null, 2);
+  $('#compare-out').className = 'empty';
+  $('#compare-out').textContent = '已保存本次结果，可与其他查询比较';
+}
+
+async function refresh() {
+  try {
+    const s = await api('/api/status');
+    renderStatus(s);
+  } catch (e) { toast('状态刷新失败: ' + e.message, true); }
+}
+
+async function runReport() {
+  const btn = $('#run-report');
+  btn.disabled = true;
+  try {
+    const r = await api('/api/report', {
+      method: 'POST',
+      body: JSON.stringify({
+        policy: $('#policy').value,
+        max_wait_ms: Number($('#wait').value || 1500),
+      }),
+    });
+    renderReport(r);
+    toast('查询完成：' + r.consistency.mode);
+    await refresh();
+  } catch (e) {
+    const banner = $('#banner');
+    banner.className = 'banner partial';
+    banner.innerHTML = `<strong>查询失败</strong> — ${esc(e.message)}${e.body && e.body.hint ? ` <span class="muted">（${esc(e.body.hint)}）</span>` : ''}`;
+    toast(e.message, true);
+  } finally { btn.disabled = false; }
+}
+
+async function control(action, body = {}, silent = false) {
+  try {
+    const r = await api('/api/control/' + action, {method: 'POST', body: JSON.stringify(body)});
+    if (!silent) toast(action + ' 完成');
+    await refresh();
+    return r;
+  } catch (e) { toast(e.message, true); }
+}
+
+$$('[data-start]').forEach(b => b.onclick = () => control('start', {domain: b.dataset.start}));
+$$('[data-stop]').forEach(b => b.onclick = () => control('stop', {domain: b.dataset.stop}));
+$$('[data-advance]').forEach(b => b.onclick = () => control('advance', {domain: b.dataset.advance}));
+$$('[data-unconfirmed]').forEach(b => b.onclick = () => control('advance', {domain: b.dataset.unconfirmed, confirmed: false}));
+$$('[data-revise]').forEach(b => b.onclick = () => {
+  const batch = window.prompt('要修订哪个批次 ID？') ;
+  if (batch) control('revise', {domain: b.dataset.revise, batch_id: batch});
+});
+$$('[data-gc]').forEach(b => b.onclick = async () => {
+  const r = await control('gc', {domain: b.dataset.gc});
+  if (r) toast(`GC ${b.dataset.gc}: 删除 ${r.deleted_snapshots.length}，保留受租约保护 ${r.retained_pinned_snapshots.length}`);
+});
+$$('[data-coord]').forEach(b => b.onclick = () => control(
+  b.dataset.coord === 'start' ? 'start-coordinator' : 'stop-coordinator'));
+$('[data-hold-task]').onclick = () => control('hold-task', {
+  hold_seconds: Number($('[data-hold-task]').dataset.holdTask),
+  policy: $('#policy').value,
+});
+$('[data-release-stale]').onclick = async () => {
+  const s = await api('/api/status');
+  const task = (s.tasks || [])[0];
+  if (!task) return toast('没有可释放的任务', true);
+  const r = await control('release-task', {task_id: task.task_id, stale: true}, true);
+  if (r) {
+    const ok = r.results.every(x => !x.released);
+    toast(ok ? '旧 token 被拒绝，租约仍然有效（符合预期）' : '意外：旧 token 竟释放成功', !ok);
+  }
+};
+document.addEventListener('click', async ev => {
+  const normal = ev.target.closest('[data-release-task]');
+  const stale = ev.target.closest('[data-release-stale-task]');
+  if (normal) { await control('release-task', {task_id: normal.dataset.releaseTask}, true); }
+  if (stale) {
+    const r = await control('release-task', {task_id: stale.dataset.releaseStaleTask, stale: true}, true);
+    if (r) {
+      const refused = r.results.every(x => !x.released);
+      toast(refused ? '旧 token 被拒绝：快照租约仍受保护' : '意外：旧 token 释放成功', !refused);
+    }
+  }
+});
+$('[data-refresh]').onclick = refresh;
+$('#run-report').onclick = runReport;
+$('#compare').onclick = async () => {
+  try {
+    const r = await api(`/api/compare?left=${encodeURIComponent($('#cmp-left').value)}&right=${encodeURIComponent($('#cmp-right').value)}`);
+    const out = $('#compare-out');
+    out.className = '';
+    const rows = r.differences.length
+      ? r.differences.map(d => `<tr><td>${esc(d.field)}</td><td class="mono">${esc(JSON.stringify(d.left))}</td><td class="mono">${esc(JSON.stringify(d.right))}</td></tr>`).join('')
+      : '<tr><td colspan="3" class="empty">两次结果在对比字段上完全一致</td></tr>';
+    out.innerHTML = `
+      <div class="muted" style="font-size:12px;margin-bottom:8px">
+        同批次：${r.same_batch ? '<span class="tag ok">是</span>' : '<span class="tag bad">否</span>'}
+        · ${esc(r.left.summary.mode)} → ${esc(r.right.summary.mode)}
+      </div>
+      <table><thead><tr><th>字段</th><th>左 (${esc(r.left.run_id)})</th><th>右 (${esc(r.right.run_id)})</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) { toast(e.message, true); }
+};
+$$('[data-log]').forEach(b => b.onclick = async () => {
+  try {
+    const r = await api('/api/logs?name=' + encodeURIComponent(b.dataset.log));
+    $('#log-out').textContent = [...(r.supervisor || []), '--- service log tail ---', ...(r.service_log_tail || [])].join('\n') || '（空）';
+  } catch (e) { toast(e.message, true); }
+});
+
+// policy text
+(async () => {
+  try {
+    const p = await api('/api/policy');
+    $('#banner').innerHTML = `<strong>可用性承诺：${esc(p.policy)}</strong> — ${esc(p.consistency)} ` +
+      `<span class="muted">${esc(p.degraded)}</span>`;
+  } catch { /* coordinator may be down at boot */ }
+})();
+
+refresh();
+setInterval(refresh, 4000);
+setInterval(() => { $('#clock').textContent = new Date().toLocaleTimeString('zh-CN'); }, 1000);
+</script>
+</body>
+</html>
